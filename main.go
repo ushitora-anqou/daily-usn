@@ -65,6 +65,7 @@ func fetchUSNFromCVE(cveId string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	log.Printf("GET %s\n", url)
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", err
@@ -153,6 +154,26 @@ func diffTrivyVulnerabilities(oldVuls []TrivyJSONResultVulnerability, newVuls []
 	return res
 }
 
+func loadTrivyVulnerabilities(fileName string) ([]TrivyJSONResultVulnerability, error) {
+	file, err := os.Open(fileName)
+	if err != nil {
+		log.Printf("Couldn't open file (%s, %s). Treated as no results.", fileName, err)
+		return []TrivyJSONResultVulnerability{}, nil
+	}
+	defer file.Close()
+
+	j, err := parseTrivyJSON(file)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(j.Results) != 1 {
+		return nil, fmt.Errorf("Invalid # of JSON results: %d", len(j.Results))
+	}
+
+	return j.Results[0].Vulnerabilities, nil
+}
+
 func process() error {
 	newFiles, err := os.ReadDir(TRIVY_RESULT_DIR)
 	if err != nil {
@@ -167,32 +188,15 @@ func process() error {
 		fmt.Printf("new_file_path = %s\n", newFilePath)
 		fmt.Printf("old_file_path = %s\n", oldFilePath)
 
-		newFile, err := os.Open(newFilePath)
+		newVuls, err := loadTrivyVulnerabilities(newFilePath)
 		if err != nil {
 			return err
 		}
-		defer newFile.Close()
-		oldFile, err := os.Open(oldFilePath)
+		oldVuls, err := loadTrivyVulnerabilities(oldFilePath)
 		if err != nil {
 			return err
 		}
-		defer oldFile.Close()
-
-		newJSON, err := parseTrivyJSON(newFile)
-		if err != nil {
-			return err
-		}
-		oldJSON, err := parseTrivyJSON(oldFile)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("newJSON SchemaVersion = %d\n", newJSON.SchemaVersion)
-		fmt.Printf("oldJSON SchemaVersion = %d\n", oldJSON.SchemaVersion)
-
-		if len(oldJSON.Results) != 1 || len(newJSON.Results) != 1 {
-			return fmt.Errorf("Invalid # of JSON results: %d, %d", len(oldJSON.Results), len(newJSON.Results))
-		}
-		trivyVuls := diffTrivyVulnerabilities(oldJSON.Results[0].Vulnerabilities, newJSON.Results[0].Vulnerabilities)
+		trivyVuls := diffTrivyVulnerabilities(oldVuls, newVuls)
 
 		vuls := []*Vulnerabililty{}
 		for _, trivyVul := range trivyVuls {
