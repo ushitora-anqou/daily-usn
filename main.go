@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"text/template"
 )
 
 const (
@@ -58,6 +60,7 @@ type Vulnerabililty struct {
 	Links            []string
 	Title            string
 	Description      string
+	Severity         string
 }
 
 func fetchUSNFromCVE(cveId string) (string, error) {
@@ -125,6 +128,7 @@ func NewVulnerability(j *TrivyJSONResultVulnerability) *Vulnerabililty {
 		Links:            links,
 		Title:            j.Title,
 		Description:      j.Description,
+		Severity:         j.Severity,
 	}
 }
 
@@ -174,6 +178,71 @@ func loadTrivyVulnerabilities(fileName string) ([]TrivyJSONResultVulnerability, 
 	return j.Results[0].Vulnerabilities, nil
 }
 
+func generateHTML(vuls []*Vulnerabililty) (string, error) {
+	const tpl = `
+<html>
+<head>
+<title>daily-usn</title>
+<style>
+table,
+td {
+    border: 1px solid #333;
+}
+
+thead,
+tfoot {
+    background-color: #333;
+    color: #fff;
+}
+</style>
+</head>
+<body>
+<table>
+<thead>
+	<tr>
+		<th>Package Name</th>
+		<th>Vulnerability ID</th>
+		<th>USN ID</th>
+		<th>Severity</th>
+		<th>Installed Version </th>
+		<th>Fixed Version</th>
+		<th>Links</th>
+	</tr>
+</thead>
+<tbody>
+{{ range .Vuls }}
+<tr>
+	<td>{{ .PkgName }}</td>
+	<td>{{ .ID }}</td>
+	<td>{{ .USN }}</td>
+	<td>{{ .Severity }}</td>
+	<td>{{ .InstalledVersion }}</td>
+	<td>{{ .FixedVersion }}</td>
+	<td>{{ range .Links }}<a href="{{ . }}">{{ . }}</a><br /> {{ end }}</td>
+</tr>
+{{ end }}
+</tbody>
+</table>
+</body>
+</html>
+`
+	t, err := template.New("webpage").Parse(tpl)
+	if err != nil {
+		return "", err
+	}
+	data := struct {
+		Vuls []*Vulnerabililty
+	}{
+		Vuls: vuls,
+	}
+	b := bytes.NewBufferString("")
+	if err := t.Execute(b, data); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
+}
+
 func process() error {
 	newFiles, err := os.ReadDir(TRIVY_RESULT_DIR)
 	if err != nil {
@@ -185,8 +254,8 @@ func process() error {
 
 		newFilePath := filepath.Join(TRIVY_RESULT_DIR, fileName)
 		oldFilePath := filepath.Join(TRIVY_RESULT_OLD_DIR, fileName)
-		fmt.Printf("new_file_path = %s\n", newFilePath)
-		fmt.Printf("old_file_path = %s\n", oldFilePath)
+		log.Printf("new_file_path = %s\n", newFilePath)
+		log.Printf("old_file_path = %s\n", oldFilePath)
 
 		newVuls, err := loadTrivyVulnerabilities(newFilePath)
 		if err != nil {
@@ -203,7 +272,13 @@ func process() error {
 			vul := NewVulnerability(&trivyVul)
 			vuls = append(vuls, vul)
 		}
-		fmt.Printf(">>> %d %v\n", len(vuls), vuls[0])
+		log.Printf(">>> %d %v\n", len(vuls), vuls[0])
+
+		htmlTableRows, err := generateHTML(vuls)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("<table>%s</table>", htmlTableRows)
 	}
 
 	return nil
