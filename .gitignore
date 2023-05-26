@@ -21,3 +21,7 @@
 go.work
 
 daily-usn
+
+dist/
+trivy-result/
+trivy-result-old/

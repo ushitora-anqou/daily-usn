@@ -1,0 +1,29 @@
+name: build
+on:
+  push:
+    branches:
+      - 'main'
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Release
+        # v3.2.0 https://github.com/goreleaser/goreleaser-action/releases/tag/v3.2.0
+        uses: goreleaser/goreleaser-action@b508e2e3ef3b19d4e4146d4f8fb3ba9db644a757
+        with:
+          distribution: goreleaser
+          version: v1.8.2
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
