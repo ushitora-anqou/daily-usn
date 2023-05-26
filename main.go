@@ -272,7 +272,6 @@ func process() error {
 			vul := NewVulnerability(&trivyVul)
 			vuls = append(vuls, vul)
 		}
-		log.Printf(">>> %d %v\n", len(vuls), vuls[0])
 
 		htmlTableRows, err := generateHTML(vuls)
 		if err != nil {
