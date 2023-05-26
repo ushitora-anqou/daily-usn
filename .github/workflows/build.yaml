@@ -19,11 +19,11 @@ jobs:
         run: go build -v ./...
 
       - name: Release
-        # v3.2.0 https://github.com/goreleaser/goreleaser-action/releases/tag/v3.2.0
-        uses: goreleaser/goreleaser-action@b508e2e3ef3b19d4e4146d4f8fb3ba9db644a757
+        # v4.2.0 https://github.com/goreleaser/goreleaser-action/releases/tag/v4.2.0
+        uses: goreleaser/goreleaser-action@f82d6c1c344bcacabba2c841718984797f664a6b
         with:
           distribution: goreleaser
-          version: v1.8.2
-          args: release --clean
+          version: v1.18.2
+          args: release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
